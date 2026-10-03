@@ -2583,7 +2583,7 @@ async function openOnline(){
   const db=await netInit();
   if(!db){const g=el('div');g.append(el('h2','on-h','線上玩 Play online'),
     el('p','on-p',!window.claude&&NET.fbErr?`Could not connect to Firebase: ${NET.fbErr}`:!window.claude&&(!window.TXTP_FIREBASE||/PASTE/.test(window.TXTP_FIREBASE.projectId||'PASTE'))?'Online play is not set up: the Firebase settings in index.html are still empty. You can still play on one phone.':window.claude?'Online play works when this page is opened in Claude, signed in. Ask the page owner to invite you by email from the Share menu (as an Editor), then open the link they send.':'Online play is not set up on this copy yet (it needs a Firebase database), or the connection failed. You can still play on one phone.'),
-    onBtn('OK','',()=>{$('online').hidden=true;}),el('p','on-p dim','Frontline 2026-10-04'));onShow(g);return;}
+    onBtn('OK','',()=>{$('online').hidden=true;}),el('p','on-p dim','Frontline 2026-10-04b · Firebase ready'));onShow(g);return;}
   renderHome();
 }
 function renderHome(){
@@ -2598,7 +2598,7 @@ function renderHome(){
   inp.oninput=()=>{inp.value=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'');};
   row.append(inp,onBtn('Join','blue',()=>{if(inp.value.length===4)enterGame(inp.value);else toast('Type the 4-letter game code.');}));f.append(el('p','on-l','Have a code from a friend?'),row);
   const list=el('div','on-list');f.append(el('p','on-l','Games waiting for players'),list);
-  f.append(el('p','on-p dim','Frontline 2026-10-04'));
+  f.append(el('p','on-p dim','Frontline 2026-10-04b · Firebase ready'));
   if(NET.canWrite===false)f.append(el('p','on-warn','You can watch games. To play, the page owner needs to invite you as an Editor (Share menu).'));
   onShow(f);
   NET.db.collection('games').where('status','==','open').limit(30).get().then(snap=>{

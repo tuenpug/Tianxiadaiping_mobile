@@ -1,5 +1,31 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>天下太平 Phone</title>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121519">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>天下太平</title>
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<script>
+/* =====================================================================
+   ONLINE PLAY SETTINGS — paste your Firebase config here.
+   In the Firebase console: Project settings → Your apps → Web app →
+   "SDK setup and configuration" → Config. Copy the part between { and }
+   and replace everything between the { } below.
+   Leave it as it is and the game still works on one phone.
+   ===================================================================== */
+window.TXTP_FIREBASE = {
+  apiKey: "PASTE-YOUR-API-KEY",
+  authDomain: "PASTE-YOUR-PROJECT.firebaseapp.com",
+  projectId: "PASTE-YOUR-PROJECT-ID",
+  storageBucket: "PASTE-YOUR-PROJECT.appspot.com",
+  messagingSenderId: "PASTE",
+  appId: "PASTE"
+};
+</script>
+</head>
+<body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=ZCOOL+KuaiLe&family=Fredoka:wght@400;500;600;700&family=Noto+Serif+TC:wght@600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
@@ -408,6 +434,7 @@ body.cover-on .pcol{visibility:hidden}
 .on-btn.small{padding:8px 14px;font-size:14px;margin-left:auto}
 .on-btn.red{background:var(--red)}.on-btn.green{background:var(--green)}.on-btn.purple{background:var(--purple)}
 .on-row{display:flex;gap:8px}.on-row .on-btn{flex:none}
+.on-in.name{letter-spacing:.02em;font-size:17px}
 .on-in{flex:1;min-width:0;border:2px solid #e2d3ad;border-radius:999px;padding:10px 16px;font:700 20px "Fredoka",monospace;letter-spacing:.3em;text-align:center;color:#2d1f3d;background:#fff}
 .on-list{display:grid;gap:6px}
 .on-code{font-size:46px;font-weight:700;letter-spacing:.2em;text-align:center;background:#fff;border-radius:16px;padding:6px;border:3px dashed #ffaa3b}
@@ -2262,7 +2289,7 @@ const mine=p=>!NET.on||p===NET.seat;
 const pad5=n=>String(n).padStart(5,'0');
 const HANDS={r:{zh:'揼',en:'Rock',e:'✊'},s:{zh:'剪',en:'Scissors',e:'✌️'},p:{zh:'包',en:'Paper',e:'✋'}};
 async function dbWrite(path,body,tries=3){for(let i=0;i<tries;i++){try{await NET.db.doc(path).set(body);return true;}catch(e){
-  if(e&&e.code==='invalid_argument'){toast("You can watch this game, but the page owner needs to invite you as an Editor to play.");return false;}
+  if(e&&(e.code==='invalid_argument'||e.code==='permission-denied')){if(!NET.user){toast('That move was refused by the game server.');return false;}toast("You can watch this game, but the page owner needs to invite you as an Editor to play.");return false;}
   await new Promise(r=>setTimeout(r,600+Math.random()*900));}}toast('Could not reach the game. Check your connection.');return false;}
 function commit(a){
   if(!G||!G.wait||G.wait.kind!=='act'||a.p!==G.wait.seat||!mine(a.p))return;
@@ -2339,15 +2366,32 @@ async function showHands(w,pk,winners){
   box.hidden=false;SFX.harpUp(6,6,.05);await wait(1900);box.hidden=true;
 }
 /* ---------- lobby ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+async function firebaseDb(){
+  try{if(!window.firebase){const V='10.12.2';await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`);}
+    if(!firebase.apps||!firebase.apps.length)firebase.initializeApp(window.TXTP_FIREBASE);
+    const fs=firebase.firestore(),clean=b=>JSON.parse(JSON.stringify(b));
+    const wd=d=>({id:d.id,exists:typeof d.exists==='function'?d.exists():!!d.exists,data:()=>d.data(),metadata:d.metadata||{}});
+    const wq=q=>({docs:q.docs.map(wd),size:q.size,empty:q.empty});
+    const Q=r=>({where:(f,o,v)=>Q(r.where(f,o,v)),limit:n=>Q(r.limit(n)),orderBy:(f,d)=>Q(r.orderBy(f,d)),get:()=>r.get().then(wq),onSnapshot:(n,e)=>r.onSnapshot(x=>n(wq(x)),e)});
+    return{doc:p=>{const r=fs.doc(p);return{get:()=>r.get().then(wd),set:b=>r.set(clean(b)),update:b=>r.update(clean(b)),onSnapshot:(n,e)=>r.onSnapshot(x=>n(wd(x)),e)};},
+      collection:p=>Q(fs.collection(p))};
+  }catch(e){console.warn('Firebase failed',e);return null;}
+}
 async function netInit(){
   if(NET.tried)return NET.db;NET.tried=true;
   const use=n=>window.claude&&window.claude.use?window.claude.use(n).catch(()=>null):Promise.resolve(null);
-  const [db,user]=await Promise.all([use('db'),use('user')]);NET.db=db;NET.user=user;
+  let [db,user]=await Promise.all([use('db'),use('user')]);
+  if(!db&&window.TXTP_FIREBASE&&window.TXTP_FIREBASE.projectId&&!/PASTE/.test(window.TXTP_FIREBASE.projectId)){db=await firebaseDb();user=null;}
+  NET.db=db;NET.user=user;
   if(user){try{NET.uid=await user.id();}catch(e){}try{NET.canWrite=await user.can('data.write');}catch(e){}}
-  if(!NET.uid)NET.uid='anon-'+Math.random().toString(36).slice(2,10);
+  if(!NET.uid){try{NET.uid=localStorage.getItem('txtp-uid');}catch(e){}
+    if(!NET.uid){NET.uid='p'+Math.random().toString(36).slice(2,12);try{localStorage.setItem('txtp-uid',NET.uid)}catch(e){}}}
   return db;
 }
-async function nameOf(uid){if(!uid)return '';if(uid===NET.uid)return 'You';if(NET.names[uid])return NET.names[uid];
+async function nameOf(uid){if(!uid)return '';if(uid===NET.uid)return 'You';
+  if(!NET.user){for(const k in NET.seats)if(NET.seats[k]&&NET.seats[k].uid===uid)return String(NET.seats[k].name||'A friend').slice(0,24);return 'A friend';}
+  if(NET.names[uid])return NET.names[uid];
   try{const ps=await NET.user.profiles([uid]);NET.names[uid]=(ps&&ps[uid]&&ps[uid].name)||'A friend';}catch(e){NET.names[uid]='A friend';}return NET.names[uid];}
 function onShow(html){const b=$('onBody');b.innerHTML='';b.appendChild(html);$('online').hidden=false;}
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -2356,7 +2400,7 @@ async function openOnline(){
   ac();const f=el('div');f.append(el('h2','on-h','線上玩 Play online'),el('p','on-p','Connecting…'));onShow(f);
   const db=await netInit();
   if(!db){const g=el('div');g.append(el('h2','on-h','線上玩 Play online'),
-    el('p','on-p','Online play works when this page is opened in Claude, signed in. Ask the page owner to invite you by email from the Share menu (as an Editor), then open the link they send.'),
+    el('p','on-p',window.claude?'Online play works when this page is opened in Claude, signed in. Ask the page owner to invite you by email from the Share menu (as an Editor), then open the link they send.':'Online play is not set up on this copy yet (it needs a Firebase database), or the connection failed. You can still play on one phone.'),
     onBtn('OK','',()=>{$('online').hidden=true;}));onShow(g);return;}
   renderHome();
 }
@@ -2364,6 +2408,9 @@ function renderHome(){
   const f=el('div');f.append(el('h2','on-h','線上玩 Play online'),el('p','on-p','Everyone plays on their own phone, on this same page.'));
   const last=(()=>{try{return localStorage.getItem('txtp-last')}catch(e){return null}})();
   if(last)f.append(onBtn(`Back to game ${last}`,'gold',()=>enterGame(last)));
+  if(!NET.user){const nr=el('div','on-row'),ni=el('input','on-in name');ni.placeholder='Your name';ni.maxLength=16;ni.setAttribute('aria-label','Your name');
+    try{ni.value=localStorage.getItem('txtp-name')||''}catch(e){}
+    ni.oninput=()=>{try{localStorage.setItem('txtp-name',ni.value.trim())}catch(e){}};nr.append(ni);f.append(el('p','on-l','Your name'),nr);}
   f.append(onBtn(`Create a new ${chosenN}-player game`,'pink',()=>createGame(chosenN)));
   const row=el('div','on-row'),inp=el('input','on-in');inp.placeholder='CODE';inp.maxLength=4;inp.autocapitalize='characters';inp.setAttribute('aria-label','Game code');
   inp.oninput=()=>{inp.value=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'');};
@@ -2383,6 +2430,7 @@ async function createGame(np){
   if(!await dbWrite('games/'+code,{np,host:NET.uid,status:'open',created:Date.now()}))return null;
   await enterGame(code,0);return code;
 }
+function myName(){let n='';try{n=localStorage.getItem('txtp-name')||''}catch(e){}return n.trim().slice(0,16)||'Player';}
 function leaveOnline(){NET.unsubs.forEach(u=>{try{u()}catch(e){}});NET.unsubs=[];
   Object.assign(NET,{on:false,started:false,code:null,seat:-1,game:null,seats:{},acts:{},picks:{},nextSeq:1,loaded:{acts:false,picks:false,seats:false}});FAST=false;$('vLeave').hidden=true;}
 async function enterGame(code,seat){
@@ -2420,7 +2468,7 @@ async function claimSeat(i){
   if(NET.canWrite===false){toast('Ask the page owner to invite you as an Editor to play.');return;}
   const path=`games/${NET.code}/seats/s${i}`;const d=await NET.db.doc(path).get().catch(()=>null);
   if(d&&d.exists&&d.data().uid&&d.data().uid!==NET.uid){toast('Someone just took that seat.');return;}
-  await dbWrite(path,{uid:NET.uid,animal:FACES[i],chosen:false,at:Date.now()});
+  await dbWrite(path,{uid:NET.uid,name:myName(),animal:FACES[i],chosen:false,at:Date.now()});
 }
 async function renderLobby(){
   if(NET.started||!NET.code)return;
@@ -2452,7 +2500,7 @@ async function startOnline(){
   pump();
 }
 function saveAnimal(){if(!NET.on||NET.seat<0)return;const S=NET.seats[NET.seat]||{};
-  dbWrite(`games/${NET.code}/seats/s${NET.seat}`,{uid:NET.uid,animal:FACES[NET.seat],chosen:true,at:S.at||Date.now()});}
+  dbWrite(`games/${NET.code}/seats/s${NET.seat}`,{uid:NET.uid,name:myName(),animal:FACES[NET.seat],chosen:true,at:S.at||Date.now()});}
 async function playAgainOnline(){
   const old=NET.code,s=NET.seat,np=NET.np;if(s<0){toast('Only players can start a new game.');return;}
   const A='ABCDEFGHJKLMNPQRSTUVWXYZ';const code=Array.from({length:4},()=>A[Math.floor(Math.random()*A.length)]).join('');
@@ -2512,4 +2560,5 @@ addEventListener('pointermove',e=>{if(!coverOn)return;const x=e.clientX/innerWid
 </script>
 
 
-</body></html>
+</body>
+</html>
